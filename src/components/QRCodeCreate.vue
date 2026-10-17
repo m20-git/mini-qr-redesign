@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Copy, Save, FolderOpen, ImageDown, FileCode, FileText } from '@lucide/vue'
 import BatchExportFieldsGuide from '@/components/BatchExportFieldsGuide.vue'
 import CopyImageModal from '@/components/CopyImageModal.vue'
 import DataTemplatesModal from '@/components/DataTemplatesModal.vue'
@@ -619,7 +620,7 @@ function applySelectedPresetToState() {
 watch(selectedPreset, applySelectedPresetToState, { immediate: true })
 
 //#region /* Default QR code text */
-const defaultQRCodeText = computed(() => t('Have nice day!'))
+const defaultQRCodeText = computed(() => 'https://example.com')
 const lastCustomLoadedFramePreset = ref<FramePreset>()
 const CUSTOM_LOADED_FRAME_PRESET_KEYS = [
   LAST_LOADED_LOCALLY_PRESET_KEY,
@@ -733,22 +734,6 @@ onMounted(() => {
     frameText.value = defaultFrameText.value
   }
 })
-//#endregion
-
-//#region /* QR code text autofill -  Fill if empty */
-watch(locale, () => {
-  if (!props.initialData && data.value.trim() === '') {
-    data.value = defaultQRCodeText.value
-  }
-})
-
-watch(defaultQRCodeText, (now, prev) => {
-  const untouched = !props.initialData && (data.value.trim() === '' || data.value === prev)
-  if (untouched) {
-    data.value = now
-  }
-})
-
 //#endregion
 
 //#region /* General Export - download qr code and copy to clipboard */
@@ -1021,10 +1006,15 @@ watch(
 )
 
 onMounted(() => {
+  const storedConfig = isLocalStorageEnabled() ? loadQRConfig() : null
   if (isLocalStorageEnabled()) {
-    const storedConfig = loadQRConfig()
     if (storedConfig) {
       applyQRConfig(storedConfig, LAST_LOADED_LOCALLY_PRESET_KEY)
+      // Replace only the original bundled demo style; keep user-made styles.
+      if (storedConfig.style?.background === '#697d80') {
+        selectedPreset.value = { ...defaultPreset }
+        selectedPresetKey.value = defaultPreset.name
+      }
     } else {
       selectedPreset.value = { ...defaultPreset }
       selectedPresetKey.value = defaultPreset.name
@@ -1076,12 +1066,16 @@ onMounted(() => {
     }
   }
 
-  // Set initial data if provided through props
-  if (props.initialData) {
-    data.value = props.initialData
-  } else if (data.value.trim() === '') {
-    data.value = defaultQRCodeText.value
+  // Show framing on the first visit, after preset watchers have settled.
+  // An explicit deployment field selection or a saved preference stays authoritative.
+  if (!storedConfig && !hasConfiguredVisibleFields) {
+    nextTick(() => {
+      showFrame.value = true
+    })
   }
+
+  // Each visit starts with an empty editor unless coming from the scanner.
+  data.value = props.initialData || import.meta.env.VITE_DEFAULT_DATA_TO_ENCODE || ''
 })
 //#endregion
 
@@ -1530,7 +1524,7 @@ const updateDataFromModal = (newData: string) => {
             <StyledQRCode
               v-bind="{
                 ...qrCodeProps,
-                data: data?.length > 0 ? data : t('Have nice day!'),
+                data: previewData,
                 width: PREVIEW_QRCODE_DIM_UNIT,
                 height: PREVIEW_QRCODE_DIM_UNIT
               }"
@@ -1544,7 +1538,7 @@ const updateDataFromModal = (newData: string) => {
             <button
               v-if="exportMode !== ExportMode.Batch"
               id="copy-qr-image-button"
-              class="button flex w-fit max-w-full flex-row items-center gap-1"
+              class="button studio-export-action flex w-fit max-w-full flex-row items-center gap-1"
               @click="copyQRToClipboard"
               :disabled="isExportButtonDisabled"
               :title="
@@ -1554,64 +1548,28 @@ const updateDataFromModal = (newData: string) => {
               "
               :aria-label="t('Copy QR Code to clipboard')"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                <g
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                >
-                  <path d="M8 10a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2z" />
-                  <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
-                </g>
-              </svg>
-              <p>{{ t('Copy QR Code to clipboard') }}</p>
+              <Copy :size="20" aria-hidden="true" />
+              <span class="sr-only">{{ t('Copy QR Code to clipboard') }}</span>
             </button>
             <button
               id="save-qr-code-config-button"
-              class="button flex w-fit max-w-full flex-row items-center gap-1"
+              class="button studio-export-action flex w-fit max-w-full flex-row items-center gap-1"
               @click="downloadQRConfig"
               :title="t('Save QR Code configuration')"
               :aria-label="t('Save QR Code configuration')"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                <g
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                >
-                  <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                  <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
-                  <path d="M12 11v6" />
-                  <path d="M9.5 14.5L12 17l2.5-2.5" />
-                </g>
-              </svg>
-              <p>{{ t('Save QR Code configuration') }}</p>
+              <Save :size="20" aria-hidden="true" />
+              <span class="sr-only">{{ t('Save QR Code configuration') }}</span>
             </button>
             <button
               id="load-qr-code-config-button"
-              class="button flex w-fit max-w-full flex-row items-center gap-1"
+              class="button studio-export-action flex w-fit max-w-full flex-row items-center gap-1"
               @click="loadQrConfigFromFile"
+              :title="t('Load QR Code configuration')"
               :aria-label="t('Load QR Code configuration')"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                <g
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                >
-                  <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                  <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
-                  <path d="M12 17v-6" />
-                  <path d="M9.5 13.5L12 11l2.5 2.5" />
-                </g>
-              </svg>
-              <p>{{ t('Load QR Code configuration') }}</p>
+              <FolderOpen :size="20" aria-hidden="true" />
+              <span class="sr-only">{{ t('Load QR Code configuration') }}</span>
             </button>
           </div>
           <section
@@ -1636,7 +1594,7 @@ const updateDataFromModal = (newData: string) => {
               <div class="flex flex-row items-center justify-center gap-2">
                 <button
                   id="download-qr-image-button-png"
-                  class="button"
+                  class="button studio-export-action"
                   @click="() => downloadQRImage('png')"
                   :disabled="isExportButtonDisabled"
                   :title="
@@ -1646,32 +1604,12 @@ const updateDataFromModal = (newData: string) => {
                   "
                   :aria-label="t('Download QR Code as PNG')"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                  >
-                    <g fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                      <path d="M5 12V5a2 2 0 0 1 2-2h7l5 5v4" />
-                      <text
-                        x="1"
-                        y="22"
-                        fill="currentColor"
-                        stroke="none"
-                        font-size="11px"
-                        font-family="monospace"
-                        font-weight="600"
-                      >
-                        PNG
-                      </text>
-                    </g>
-                  </svg>
+                  <ImageDown :size="20" aria-hidden="true" />
+                  <span class="export-format">PNG</span>
                 </button>
                 <button
                   id="download-qr-image-button-jpg"
-                  class="button"
+                  class="button studio-export-action"
                   @click="() => downloadQRImage('jpg')"
                   :disabled="isExportButtonDisabled"
                   :title="
@@ -1681,32 +1619,12 @@ const updateDataFromModal = (newData: string) => {
                   "
                   :aria-label="t('Download QR Code as JPG')"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                  >
-                    <g fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                      <path d="M5 12V5a2 2 0 0 1 2-2h7l5 5v4" />
-                      <text
-                        x="1"
-                        y="22"
-                        fill="currentColor"
-                        stroke="none"
-                        font-size="11px"
-                        font-family="monospace"
-                        font-weight="600"
-                      >
-                        JPG
-                      </text>
-                    </g>
-                  </svg>
+                  <ImageDown :size="20" aria-hidden="true" />
+                  <span class="export-format">JPG</span>
                 </button>
                 <button
                   id="download-qr-image-button-svg"
-                  class="button"
+                  class="button studio-export-action"
                   @click="() => downloadQRImage('svg')"
                   :disabled="isExportButtonDisabled"
                   :title="
@@ -1716,32 +1634,12 @@ const updateDataFromModal = (newData: string) => {
                   "
                   :aria-label="t('Download QR Code as SVG')"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                  >
-                    <g fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                      <path d="M5 12V5a2 2 0 0 1 2-2h7l5 5v4" />
-                      <text
-                        x="1"
-                        y="22"
-                        fill="currentColor"
-                        stroke="none"
-                        font-size="11px"
-                        font-family="monospace"
-                        font-weight="600"
-                      >
-                        SVG
-                      </text>
-                    </g>
-                  </svg>
+                  <FileCode :size="20" aria-hidden="true" />
+                  <span class="export-format">SVG</span>
                 </button>
                 <button
                   id="download-qr-text-button"
-                  class="button"
+                  class="button studio-export-action"
                   @click="openTextExportModal"
                   :disabled="isExportButtonDisabled"
                   :title="
@@ -1751,28 +1649,7 @@ const updateDataFromModal = (newData: string) => {
                   "
                   :aria-label="t('Export QR Code as ASCII or Unicode text')"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                  >
-                    <g fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                      <path d="M5 12V5a2 2 0 0 1 2-2h7l5 5v4" />
-                      <text
-                        x="1"
-                        y="22"
-                        fill="currentColor"
-                        stroke="none"
-                        font-size="11px"
-                        font-family="monospace"
-                        font-weight="600"
-                      >
-                        TXT
-                      </text>
-                    </g>
-                  </svg>
+                  <FileText :size="20" aria-hidden="true" /><span class="export-format">TXT</span>
                 </button>
               </div>
             </div>
@@ -2151,18 +2028,20 @@ const updateDataFromModal = (newData: string) => {
             <section class="w-full space-y-4">
               <div class="field-reveal" v-show="isFieldVisible('preset')">
                 <label>{{ t('Preset') }}</label>
-                <div class="flex flex-row items-center justify-start gap-2">
+                <div class="studio-preset-row">
                   <Combobox
                     :items="allPresetOptions"
+                    list-max-height="180px"
                     v-model:value="selectedPresetKey"
                     v-model:open="isPresetSelectOpen"
                     :button-label="t('Select QR code preset')"
                     :insert-divider-at-indexes="[0, 2]"
                   />
                   <button
-                    class="button grid size-10 place-items-center"
+                    class="button studio-randomize"
                     @click="randomizeStyleSettings"
                     :aria-label="t('Randomize style')"
+                    :title="t('Randomize style')"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -2220,10 +2099,10 @@ const updateDataFromModal = (newData: string) => {
                 class="field-reveal flex flex-row items-center gap-2"
                 v-show="isFieldVisible('logoBackground')"
               >
+                <input id="with-background" type="checkbox" v-model="includeBackground" />
                 <label for="with-background">
                   {{ t('With background') }}
                 </label>
-                <input id="with-background" type="checkbox" v-model="includeBackground" />
               </div>
               <div
                 id="color-settings"
@@ -2520,7 +2399,11 @@ const updateDataFromModal = (newData: string) => {
             </section>
           </AccordionContent>
         </AccordionItem>
-        <AccordionItem class="studio-card" v-show="isFrameSectionVisible" value="frame-settings">
+        <AccordionItem
+          class="studio-card studio-frame-card"
+          v-show="isFrameSectionVisible"
+          value="frame-settings"
+        >
           <AccordionTrigger
             class="button !px-4 text-2xl text-gray-700 outline-none dark:text-gray-100 md:!px-6 lg:!px-8"
             ><span id="frame-settings-title">{{ t('Frame settings') }}</span></AccordionTrigger
@@ -2528,8 +2411,8 @@ const updateDataFromModal = (newData: string) => {
           <AccordionContent class="studio-section-content px-2 pb-8 pt-4">
             <section class="w-full space-y-4" aria-labelledby="frame-settings-title">
               <div class="flex flex-row items-center gap-2">
-                <label for="show-frame">{{ t('Add frame') }}</label>
                 <input id="show-frame" type="checkbox" v-model="showFrame" />
+                <label for="show-frame">{{ t('Add frame') }}</label>
               </div>
 
               <template v-if="showFrame">

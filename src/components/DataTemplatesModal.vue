@@ -43,7 +43,7 @@ const smsMessage = ref('')
 // WiFi refs
 const wifiSSID = ref('')
 const wifiPassword = ref('')
-const wifiEncryption = ref('nopass')
+const wifiEncryption = ref('WPA')
 const wifiHidden = ref(false)
 
 // vCard refs
@@ -247,7 +247,7 @@ const detectAndSetDataType = (data: string) => {
 
     case 'wifi':
       wifiSSID.value = (result.parsedData.ssid as string) || ''
-      wifiEncryption.value = (result.parsedData.encryption as 'nopass' | 'WEP' | 'WPA') || 'nopass'
+      wifiEncryption.value = (result.parsedData.encryption as 'nopass' | 'WEP' | 'WPA') || 'WPA'
       wifiPassword.value = (result.parsedData.password as string) || ''
       wifiHidden.value = Boolean(result.parsedData.hidden)
       break
@@ -855,8 +855,8 @@ const closeModal = () => {
             {{ t('Password is required when encryption is enabled') }}
           </p>
           <div class="flex w-fit flex-row items-center justify-center gap-2">
-            <label for="wifiHidden"> {{ t('Hidden SSID') }}</label>
             <input type="checkbox" id="wifiHidden" v-model="wifiHidden" class="shrink-0" />
+            <label for="wifiHidden"> {{ t('Hidden SSID') }}</label>
           </div>
         </div>
 

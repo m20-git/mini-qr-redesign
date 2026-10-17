@@ -53,7 +53,7 @@ function setOpen(value: boolean): void {
        inside a Dialog on desktop and a Drawer on mobile so it feels native on
        each. -->
   <Dialog v-if="isLarge" :open="open" @update:open="setOpen">
-    <DialogContent class="max-h-[80vh] overflow-y-auto">
+    <DialogContent class="max-h-[80vh] overflow-y-auto sm:max-w-[680px]">
       <DialogHeader>
         <DialogTitle>{{ t('Choose fields') }}</DialogTitle>
         <DialogDescription>

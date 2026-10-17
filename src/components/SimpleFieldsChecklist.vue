@@ -56,12 +56,12 @@ function toggle(key: SimpleFieldKey, checked: boolean): void {
         <span>{{ t(group.enableToggleLabelKey) }}</span>
       </label>
 
-      <template v-if="!group.enableToggleLabelKey || frameEnabled">
+      <div v-if="!group.enableToggleLabelKey || frameEnabled" class="field-choice-grid">
         <label
           v-for="field in group.fields"
           :key="field.key"
-          class="flex cursor-pointer flex-row items-center gap-2 text-sm"
-          :class="{ 'ms-6': group.enableToggleLabelKey }"
+          class="field-choice"
+          :class="{ 'is-selected': isChecked(field.key as SimpleFieldKey) }"
         >
           <input
             type="checkbox"
@@ -72,7 +72,46 @@ function toggle(key: SimpleFieldKey, checked: boolean): void {
           />
           <span>{{ t(field.labelKey) }}</span>
         </label>
-      </template>
+      </div>
     </fieldset>
   </div>
 </template>
+
+<style>
+.field-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.field-choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  align-self: stretch;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+}
+.field-choice input {
+  flex-shrink: 0;
+}
+.field-choice:hover {
+  background: hsl(var(--muted));
+}
+.field-choice.is-selected {
+  color: hsl(var(--accent-foreground));
+  background: hsl(var(--accent));
+  border-color: hsl(var(--primary));
+}
+.field-choice:focus-within {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+</style>

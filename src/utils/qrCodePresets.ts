@@ -1,4 +1,3 @@
-import PLACEHOLDER_IMAGE_URL from '@/assets/placeholder_image.png'
 import { isValidFrameConfig } from './framePresets'
 import GeeksHackingConfig from '@/assets/presets/geekshacking.json'
 import SpDigitalConfig from '@/assets/presets/spdigital.json'
@@ -248,24 +247,13 @@ export const vueJsPreset: Preset = {
 export const lyqhtPreset: Preset = {
   ...defaultPresetOptions,
   name: 'Default (lyqht)',
-  data: 'https://github.com/lyqht',
-  image: PLACEHOLDER_IMAGE_URL,
-  dotsOptions: {
-    color: '#abcbca',
-    type: 'extra-rounded'
-  },
-  cornersSquareOptions: {
-    color: '#abcbca',
-    type: 'extra-rounded'
-  },
-  cornersDotOptions: {
-    color: '#abcbca',
-    type: 'square'
-  },
-  style: {
-    borderRadius: '24px',
-    background: '#697d80'
-  }
+  data: '',
+  image: '',
+  margin: 4,
+  dotsOptions: { color: '#303735', type: 'rounded' },
+  cornersSquareOptions: { color: '#303735', type: 'extra-rounded' },
+  cornersDotOptions: { color: '#303735', type: 'dot' },
+  style: { borderRadius: '12px', background: '#e7e8e6' }
 }
 export const pejuangKodePreset: Preset = {
   ...defaultPresetOptions,

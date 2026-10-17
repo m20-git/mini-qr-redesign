@@ -19,6 +19,7 @@ const value = defineModel<string>('value')
 defineProps<{
   items: { value: any; label: string }[]
   insertDividerAtIndexes?: number[]
+  listMaxHeight?: string
   buttonLabel: string
 }>()
 </script>
@@ -42,7 +43,7 @@ defineProps<{
       <Command class="bg-zinc-50 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
         <CommandInput class="h-9" placeholder="Search item..." />
         <CommandEmpty>No item found.</CommandEmpty>
-        <CommandList>
+        <CommandList :style="{ maxHeight: listMaxHeight }">
           <CommandGroup>
             <template v-for="(item, index) in items" :key="item.value">
               <CommandItem

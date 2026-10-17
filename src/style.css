@@ -555,3 +555,231 @@ body {
   color: var(--studio-ink);
   border-color: var(--studio-line);
 }
+
+/* Compact, wrapping choices for QR shapes and correction levels. */
+#dots-squares-settings > fieldset {
+  flex-basis: calc(50% - 12px);
+  min-width: min(100%, 210px);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: start;
+  gap: 6px;
+}
+#dots-squares-settings > fieldset > legend,
+#dots-squares-settings > fieldset > div:not(.radio),
+#dots-squares-settings > fieldset > p {
+  width: 100%;
+}
+#dots-squares-settings .radio {
+  padding: 8px 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 8px;
+  min-height: 40px;
+}
+#dots-squares-settings .radio:has(input:checked) {
+  background: var(--studio-bg);
+  border-color: var(--studio-accent);
+}
+#dots-squares-settings .radio label {
+  font-size: 12px;
+}
+
+/* Shared palette also reaches dialogs rendered outside the app shell. */
+:root {
+  --background: 0 0% 97%;
+  --foreground: 0 0% 17%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 17%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 17%;
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 40%;
+  --border: 0 0% 85%;
+  --input: 0 0% 85%;
+  --primary: 161 52% 29%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 94%;
+  --secondary-foreground: 0 0% 17%;
+  --accent: 0 0% 91%;
+  --accent-foreground: 0 0% 17%;
+  --ring: 161 52% 29%;
+}
+:root.dark {
+  --background: 0 0% 9%;
+  --foreground: 0 0% 93%;
+  --card: 0 0% 13%;
+  --card-foreground: 0 0% 93%;
+  --popover: 0 0% 13%;
+  --popover-foreground: 0 0% 93%;
+  --muted: 0 0% 19%;
+  --muted-foreground: 0 0% 69%;
+  --border: 0 0% 29%;
+  --input: 0 0% 29%;
+  --primary: 158 44% 65%;
+  --primary-foreground: 160 30% 10%;
+  --secondary: 0 0% 19%;
+  --secondary-foreground: 0 0% 93%;
+  --accent: 0 0% 23%;
+  --accent-foreground: 0 0% 95%;
+  --ring: 158 44% 65%;
+}
+.studio-shell {
+  --studio-bg: hsl(var(--background));
+  --studio-surface: hsl(var(--card));
+  --studio-ink: hsl(var(--foreground));
+  --studio-muted: hsl(var(--muted-foreground));
+  --studio-line: hsl(var(--border));
+  --studio-accent: hsl(var(--primary));
+}
+.dark .studio-shell {
+  --studio-bg: hsl(var(--background));
+  --studio-surface: hsl(var(--card));
+  --studio-ink: hsl(var(--foreground));
+  --studio-muted: hsl(var(--muted-foreground));
+  --studio-line: hsl(var(--border));
+  --studio-accent: hsl(var(--primary));
+}
+[role='dialog'] {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+[role='dialog'] .button {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid transparent;
+}
+[role='dialog'] .secondary-button {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
+.field-choice,
+.dark .field-choice {
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+.field-choice:hover,
+.dark .field-choice:hover {
+  background: hsl(var(--muted));
+}
+.field-choice.is-selected,
+.dark .field-choice.is-selected {
+  color: hsl(var(--accent-foreground));
+  background: hsl(var(--accent));
+  border-color: hsl(var(--primary));
+}
+.field-choice:focus-within {
+  outline-color: hsl(var(--ring));
+}
+
+.studio-preset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+.studio-preset-row > [role='combobox'] {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.studio-shell .button.studio-randomize {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  color: var(--studio-ink);
+}
+.studio-randomize svg {
+  width: 24px;
+  height: 24px;
+}
+.studio-randomize path {
+  fill: currentColor;
+}
+
+/* Keep the preset control short, reserving room for the randomize action. */
+.studio-preset-row {
+  grid-template-columns: minmax(0, 250px) 44px;
+  justify-content: start;
+}
+.studio-frame-card .studio-section-content > div > section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.studio-frame-card .studio-section-content > div > section > div:first-child,
+.studio-frame-card .studio-section-content > div > section > div:last-child {
+  grid-column: 1 / -1;
+}
+.studio-frame-card .studio-section-content .space-y-4 > * {
+  margin-top: 0;
+}
+.studio-frame-card fieldset:has(#frame-text) {
+  gap: 10px;
+}
+.studio-frame-card fieldset:has(#frameTextPosition-top) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.studio-frame-card .radio {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.studio-frame-card .text-input {
+  padding: 9px 11px;
+}
+.studio-shell .button.studio-export-action {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+.export-format {
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+#main-content > div + div > div:first-child {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
+}
+#export-options {
+  margin-top: 12px;
+  width: 100%;
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+}
+#export-options h2 {
+  background: hsl(var(--card));
+  font-size: 12px;
+}
+@media (max-width: 480px) {
+  .studio-frame-card .studio-section-content > div > section {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.studio-frame-card .studio-section-content section > .field-reveal > .grid {
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 12px;
+}
+.studio-frame-card .studio-section-content section > .field-reveal > .grid > * {
+  min-width: 0;
+}
