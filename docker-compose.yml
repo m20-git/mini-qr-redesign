@@ -1,7 +1,8 @@
----
 services:
   mini-qr:
-    image: ghcr.io/lyqht/mini-qr:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: mini-qr
     restart: unless-stopped
     networks:
