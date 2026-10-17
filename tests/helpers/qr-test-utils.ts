@@ -129,9 +129,24 @@ export async function checkExport(page: Page, info: TestInfo, format: 'png' | 'j
     expect(metadata.width).toBeGreaterThan(400)
     expect(metadata.height).toBeGreaterThan(400)
     expect(svg).toContain(caption)
-    const pixel = await sharp(file).extract({ left: Math.floor(metadata.width! * 0.04), top: Math.floor(metadata.height! * 0.04), width: 1, height: 1 }).removeAlpha().raw().toBuffer()
+    // Sample halfway through the configured padding, not 4% of the image:
+    // a large QR makes that percentage fall inside the white QR background.
+    const inset = Number.parseFloat(fixture.frame!.style.borderWidth) + Number.parseFloat(fixture.frame!.style.padding) / 2
+    const region = {
+      left: Math.floor(inset * metadata.width! / naturalWidth) - 1,
+      top: Math.floor(inset * metadata.height! / naturalHeight) - 1,
+      width: 3,
+      height: 3
+    }
+    expect(region.left).toBeGreaterThanOrEqual(0)
+    expect(region.top).toBeGreaterThanOrEqual(0)
+    const sample = await sharp(file).extract(region).removeAlpha().toColourspace('srgb').raw().toBuffer({ resolveWithObject: true })
+    expect(sample.info.channels).toBe(3)
     for (const [channel, expected] of [221, 238, 255].entries()) {
-      expect(Math.abs(pixel[channel] - expected)).toBeLessThanOrEqual(format === 'jpg' ? 25 : 1)
+      let total = 0
+      for (let offset = channel; offset < sample.data.length; offset += sample.info.channels) total += sample.data[offset]
+      const mean = total / (region.width * region.height)
+      expect(Math.abs(mean - expected), `Frame padding channel ${channel}: measured ${mean}, expected ${expected}`).toBeLessThanOrEqual(format === 'jpg' ? 25 : 1)
     }
   }
   await info.attach(`export-${format}`, { path: file, contentType: format === 'jpg' ? 'image/jpeg' : 'image/png' })
