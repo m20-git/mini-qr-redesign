@@ -1,43 +1,50 @@
 # Proxmox VE installation
 
-Run as root in the Proxmox host shell, not inside an existing guest:
+## One-line installation
+
+Run as root in the Proxmox host shell:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/m20-git/mini-qr-redesign/main/proxmox/install.sh)"
 ```
 
-Review the script before executing remote code as root. This is an independent installer, not an official Community Scripts installer. It has had Bash syntax checks, but has not been tested on a running Proxmox host.
+The direct entry point is also available:
 
-## Requirements and defaults
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/m20-git/mini-qr-redesign/main/ct/mini-qr-redesign.sh)"
+```
 
-- amd64 Proxmox VE host with Debian 13 container support and an interactive terminal.
-- Active storage supporting rootdir, and storage supporting vztmpl.
-- Internet access from the host and guest; DHCP and DNS on the selected bridge/VLAN.
-- New unprivileged Debian 13 LXC; 2 CPU cores, 2048 MiB RAM, 512 MiB swap, 6 GiB root disk.
-- Choose container storage, template storage, bridge, free container ID and optional VLAN tag. Confirm before creation.
-- No Docker, nesting, host package installation or host firewall changes. Guest net0 has firewall=1; existing Proxmox firewall policies still apply.
-- Guest packages are upgraded during installation. Node.js and Caddy come from Debian; pnpm is pinned to 10.0.0 to match package.json.
-- Application build runs as the unprivileged miniqr user; Caddy serves the static build on HTTP port 80.
-- The installer uses main, not GitHub releases. Normal production build defaults apply; .env.development is not loaded.
-- Onboot is enabled only after successful provisioning. No root password or SSH login is configured; use pct enter from the host.
+Review remote scripts before running them as root. This repository is independent and is not an officially listed Community Scripts app. It uses the actual MIT-licensed community-scripts/core framework for menus, defaults, advanced configuration and LXC creation. Framework source: https://github.com/community-scripts/core (license: https://github.com/community-scripts/core/blob/main/LICENSE).
 
-The older root-level install.sh is a separate Docker installer for an existing system. Do not execute that script on the Proxmox host.
+## Flow and defaults
+
+The framework supplies Default Install, Advanced Install, User Defaults and Settings. App Defaults is shown only when the framework finds a saved defaults file for this app. Advanced configuration follows the framework's current sequence, including network, storage and access settings. Diagnostics follow the framework's existing user choice or its diagnostic consent dialog; review Settings before installing.
+
+Application defaults: Debian 13, unprivileged LXC, 2 CPU cores, 2048 MiB RAM, 6 GiB disk. User/App Defaults and Advanced Install can override values. This application provisioning script supports Debian 13 on amd64; selecting a different OS/version is not supported. No Docker is installed. Container features, SSH, password, startup behavior and host-side setup are managed by the framework, not by the previous standalone installer.
+
+The host and guest need Internet/DNS connectivity. DHCP is the normal network default; use Advanced Install to configure static networking, bridge or VLAN. Existing firewall policies still apply.
+
+## Implementation
+
+- proxmox/install.sh: compatibility launcher, preserving the previous one-liner.
+- ct/mini-qr-redesign.sh: native framework entry point and update handler.
+- install/mini-qr-redesign-install.sh: framework container installation steps.
+- proxmox/provision.sh: application build, static deployment and Caddy setup inside Debian 13.
+
+Framework files are loaded from community-scripts/core/main; application installers and source are loaded from this repository's main branch. Upstream framework changes can affect later installs. No application or test files are changed by this installer conversion. Bash syntax checks are not a substitute for an actual Proxmox installation test; the integration has not yet been tested on a live host.
+
+The root-level install.sh remains a separate Docker installer for an existing guest. Do not run it on the Proxmox host. Do not run proxmox/provision.sh on the host either.
 
 ## Access and updates
 
-The installer prints http://CONTAINER-IP. No public TLS or authentication is configured. Use your existing reverse proxy and firewall rules if needed; do not expose it unintentionally.
+Caddy serves the static build on HTTP port 80. No public TLS or application authentication is configured. Review firewall/reverse-proxy settings before external access. Build dependencies and pnpm 10.0.0 remain installed for updates. Builds run as miniqr; deployed releases are served from /var/www/mini-qr/current.
 
-From the Proxmox host (replace CTID):
+From the host, replace CTID with the installed container ID:
 
 ```bash
-pct enter CTID
 pct exec CTID -- /usr/local/sbin/update-mini-qr-redesign
 ```
 
-Or run update-mini-qr-redesign as root inside the guest. Updates pull main with --ff-only, use the pnpm lockfile, build before switching the served release, and retain the two newest deployed releases. They do not upgrade OS packages. Back up the container before updates. Keep the build tools installed for future updates.
+Or run update-mini-qr-redesign as root inside the guest. Updates pull main with --ff-only, install from the lockfile, build before switching the served release and retain the two newest deployed releases. OS packages require separate maintenance. Back up the container first and monitor free space on the 6 GiB disk.
 
-## Troubleshooting
-
-Failures leave the container in place for inspection; the script never destroys a container automatically. Do not repeatedly rerun it expecting to resume an existing installation. Use pct status CTID and pct enter CTID to inspect it. Check DHCP, DNS, VLAN and Proxmox firewall rules if network checks fail.
-
-Inside the guest, check systemctl status caddy, journalctl -u caddy and df -h. The 6 GiB disk includes the OS, source, dependencies and build output; monitor free space. If the first build fails, correct the cause and run update-mini-qr-redesign inside the guest. If provisioning stopped before Caddy configuration, that configuration step also needs to be completed; an application rebuild alone is not a full provisioning resume.
+This conversion affects new installations. Existing containers are not automatically recreated or migrated. Follow framework prompts carefully on failures; do not blindly restart the installer or delete an existing container.
