@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -98,3 +99,136 @@ jobs:
             visual-review/
           retention-days: 14
           if-no-files-found: warn
+
+  baseline-pr:
+    name: Prepare reviewed visual baseline PR
+    needs: visual
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor != 'github-actions[bot]' &&
+      needs.visual.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+      options: --ipc=host
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify Playwright matches the browser image
+        run: node -e "if (require('@playwright/test/package.json').version !== '1.59.1') process.exit(1)"
+      - name: Generate candidate reference images
+        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=all
+      - name: Validate candidates twice without retries
+        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=none --repeat-each=2
+      - name: Restrict candidate files
+        run: |
+          set -eu
+          mkdir -p visual-baseline
+          cp tests/e2e/create.spec.ts-snapshots/*-chromium-linux.png visual-baseline/
+          find visual-baseline -type f -name '*.png' -print | sort
+          count=$(find visual-baseline -type f -name '*.png' | wc -l)
+          if [ "$count" -ne 4 ]; then
+            echo "Expected exactly 4 candidate PNG files, found $count." >&2
+            exit 1
+          fi
+      - name: Detect reference image changes
+        id: changes
+        run: |
+          set -eu
+          changed=$(git status --porcelain -- tests/e2e/create.spec.ts-snapshots/*-chromium-linux.png || true)
+          if [ -z "$changed" ]; then
+            echo 'No committed visual baseline changed.'
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$changed"
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Prepare PR metadata
+        if: steps.changes.outputs.changed == 'true'
+        id: metadata
+        run: |
+          set -eu
+          short_sha="${GITHUB_SHA::12}"
+          branch="ci/visual-baselines/$short_sha"
+          title="Update visual baseline images ($short_sha)"
+          body=$(cat <<'EOF'
+          ## Purpose
+
+          This pull request updates only the four committed Chromium/Linux visual baseline PNG files.
+
+          ## Safety
+
+          - Generated only after candidate generation and two repeated visual comparisons succeeded.
+          - No application code, workflow code, functional tests, Proxmox installers or other files are changed.
+          - The visual comparison is advisory and does not approve the design by itself.
+          - A maintainer must inspect the image diff before merging.
+
+          ## Source
+
+          - Main commit: $GITHUB_SHA
+          - Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          EOF
+          )
+          {
+            echo "branch=$branch"
+            echo "title=$title"
+            cat <<EOF >> "$GITHUB_OUTPUT"
+          body<<BODY_EOF
+          $body
+          BODY_EOF
+          EOF
+          } >> "$GITHUB_OUTPUT"
+      - name: Create or update baseline branch
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          BRANCH: ${{ steps.metadata.outputs.branch }}
+        run: |
+          set -eu
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --no-tags origin "$BRANCH" || true
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+          else
+            git checkout -B "$BRANCH" "origin/${GITHUB_REF_NAME}"
+          fi
+          git add tests/e2e/create.spec.ts-snapshots/*-chromium-linux.png
+          if git diff --cached --quiet; then
+            echo 'No staged baseline changes; nothing to publish.'
+          else
+            git commit -m "Update visual baseline images for ${GITHUB_SHA::12}"
+            git push origin "$BRANCH"
+          fi
+      - name: Create or update baseline pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.metadata.outputs.branch }}
+          TITLE: ${{ steps.metadata.outputs.title }}
+          BODY: ${{ steps.metadata.outputs.body }}
+        run: |
+          set -eu
+          existing=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "$TITLE" --body "$BODY"
+            echo "Updated existing visual baseline PR #$existing."
+          else
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
+            echo 'Created visual baseline PR.'
+          fi
