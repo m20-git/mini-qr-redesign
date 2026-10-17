@@ -87,6 +87,7 @@ const isModeToggleDisabled = computed(() => {
     <div class="studio-content">
       <div class="studio-intro">
         <span class="studio-eyebrow">MINI QR · STUDIO</span>
+        <!--
         <h1>
           {{ appMode === AppMode.Create ? t('Your idea. One scan away.') : t('Scan a QR code') }}
         </h1>
@@ -97,6 +98,7 @@ const isModeToggleDisabled = computed(() => {
               : t('Scan QR codes using your camera or an image.')
           }}
         </p>
+        -->
       </div>
       <QRCodeCreate v-if="appMode === AppMode.Create" :initial-data="capturedData" />
       <div v-else class="studio-scanner">
