@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -33,6 +37,8 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+      - name: Test baseline publishing without network or write credentials
+        run: node --test .github/scripts/publish-visual-baselines.test.mjs
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Verify Playwright matches the browser image
@@ -56,7 +62,9 @@ jobs:
         run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=all
       - name: Repeat comparison against candidates twice without retries
         id: repeat
-        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=none --repeat-each=2
+        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=none --repeat-each=2 --retries=0
+      - name: Dry-run baseline publishing with real candidates
+        run: node .github/scripts/publish-visual-baselines.mjs --dry-run
       - name: Record review status
         if: always()
         env:
@@ -82,7 +90,7 @@ jobs:
             echo "Candidate generation: $GENERATION"
             echo "Two repeated candidate comparisons: $REPEAT"
             echo 'A successful candidate run is not approval of the design.'
-            echo 'No baseline or application files are committed automatically.'
+            echo 'This validation job never commits baseline or application files.'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$COMPARISON" = failure ]; then
             echo '::warning::Visual comparison failed. Inspect visual-comparison; candidate success does not erase the original mismatch.'
@@ -135,100 +143,8 @@ jobs:
       - name: Generate candidate reference images
         run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=all
       - name: Validate candidates twice without retries
-        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=none --repeat-each=2
-      - name: Restrict candidate files
-        run: |
-          set -eu
-          mkdir -p visual-baseline
-          cp tests/e2e/create.spec.ts-snapshots/*-chromium-linux.png visual-baseline/
-          find visual-baseline -type f -name '*.png' -print | sort
-          count=$(find visual-baseline -type f -name '*.png' | wc -l)
-          if [ "$count" -ne 4 ]; then
-            echo "Expected exactly 4 candidate PNG files, found $count." >&2
-            exit 1
-          fi
-      - name: Detect reference image changes
-        id: changes
-        run: |
-          set -eu
-          changed=$(git status --porcelain -- tests/e2e/create.spec.ts-snapshots/*-chromium-linux.png || true)
-          if [ -z "$changed" ]; then
-            echo 'No committed visual baseline changed.'
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-          else
-            printf '%s\n' "$changed"
-            echo 'changed=true' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Prepare PR metadata
-        if: steps.changes.outputs.changed == 'true'
-        id: metadata
-        run: |
-          set -eu
-          short_sha="${GITHUB_SHA::12}"
-          branch="ci/visual-baselines/$short_sha"
-          title="Update visual baseline images ($short_sha)"
-          body=$(cat <<'EOF'
-          ## Purpose
-
-          This pull request updates only the four committed Chromium/Linux visual baseline PNG files.
-
-          ## Safety
-
-          - Generated only after candidate generation and two repeated visual comparisons succeeded.
-          - No application code, workflow code, functional tests, Proxmox installers or other files are changed.
-          - The visual comparison is advisory and does not approve the design by itself.
-          - A maintainer must inspect the image diff before merging.
-
-          ## Source
-
-          - Main commit: $GITHUB_SHA
-          - Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-          EOF
-          )
-          {
-            echo "branch=$branch"
-            echo "title=$title"
-            cat <<EOF >> "$GITHUB_OUTPUT"
-          body<<BODY_EOF
-          $body
-          BODY_EOF
-          EOF
-          } >> "$GITHUB_OUTPUT"
-      - name: Create or update baseline branch
-        if: steps.changes.outputs.changed == 'true'
+        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=none --repeat-each=2 --retries=0
+      - name: Publish allowlisted PNGs through authenticated GitHub API
         env:
-          BRANCH: ${{ steps.metadata.outputs.branch }}
-        run: |
-          set -eu
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch --no-tags origin "$BRANCH" || true
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git checkout -B "$BRANCH" "origin/$BRANCH"
-          else
-            git checkout -B "$BRANCH" "origin/${GITHUB_REF_NAME}"
-          fi
-          git add tests/e2e/create.spec.ts-snapshots/*-chromium-linux.png
-          if git diff --cached --quiet; then
-            echo 'No staged baseline changes; nothing to publish.'
-          else
-            git commit -m "Update visual baseline images for ${GITHUB_SHA::12}"
-            git push origin "$BRANCH"
-          fi
-      - name: Create or update baseline pull request
-        if: steps.changes.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ steps.metadata.outputs.branch }}
-          TITLE: ${{ steps.metadata.outputs.title }}
-          BODY: ${{ steps.metadata.outputs.body }}
-        run: |
-          set -eu
-          existing=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            gh pr edit "$existing" --title "$TITLE" --body "$BODY"
-            echo "Updated existing visual baseline PR #$existing."
-          else
-            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
-            echo 'Created visual baseline PR.'
-          fi
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .github/scripts/publish-visual-baselines.mjs
