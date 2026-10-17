@@ -1,0 +1,100 @@
+name: Visual tests
+
+on:
+  push:
+    branches: [main, ci/separate-functional-and-visual-tests]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual:
+    name: Visual review and baseline validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+      options: --ipc=host
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify Playwright matches the browser image
+        run: node -e "if (require('@playwright/test/package.json').version !== '1.59.1') process.exit(1)"
+      - name: Compare against committed reference images
+        id: compare
+        continue-on-error: true
+        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=none
+      - name: Upload comparison report and diffs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: visual-comparison
+          path: |
+            playwright-report/visual/
+            test-results/visual/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Generate candidate reference images
+        id: generate
+        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=all
+      - name: Repeat comparison against candidates twice without retries
+        id: repeat
+        run: pnpm exec playwright test --config=playwright.visual.config.ts --update-snapshots=none --repeat-each=2
+      - name: Record review status
+        if: always()
+        env:
+          COMPARISON: ${{ steps.compare.outcome }}
+          GENERATION: ${{ steps.generate.outcome }}
+          REPEAT: ${{ steps.repeat.outcome }}
+        run: |
+          mkdir -p visual-review
+          node <<'NODE'
+          const fs = require('fs');
+          fs.writeFileSync('visual-review/status.json', JSON.stringify({
+            commit: process.env.GITHUB_SHA,
+            comparison: process.env.COMPARISON,
+            generation: process.env.GENERATION,
+            repeat: process.env.REPEAT,
+            requiresHumanReview: true,
+            baselinesCommitted: false
+          }, null, 2));
+          NODE
+          {
+            echo '## Visual review'
+            echo "Comparison with committed baselines: $COMPARISON"
+            echo "Candidate generation: $GENERATION"
+            echo "Two repeated candidate comparisons: $REPEAT"
+            echo 'A successful candidate run is not approval of the design.'
+            echo 'No baseline or application files are committed automatically.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$COMPARISON" = failure ]; then
+            echo '::warning::Visual comparison failed. Inspect visual-comparison; candidate success does not erase the original mismatch.'
+          fi
+      - name: Upload candidates, validation report and source status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: visual-candidates-for-review
+          path: |
+            tests/e2e/create.spec.ts-snapshots/*-chromium-linux.png
+            playwright-report/visual/
+            test-results/visual/
+            visual-review/
+          retention-days: 14
+          if-no-files-found: warn
