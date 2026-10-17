@@ -1,6 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import fs from 'fs'
 import sharp from 'sharp'
+import { checkExport } from '../helpers/qr-test-utils'
 
 async function openSection(page: Page, name: RegExp) {
   const header = page.getByRole('button', { name })
@@ -121,17 +122,7 @@ test.describe('QR Code Creation and Management', () => {
     for (const format of ['png', 'jpg'] as const) {
       for (const withFrame of [false, true]) {
         test(`should export as ${format.toUpperCase()} ${withFrame ? 'with' : 'without'} a frame`, async ({ page }, info) => {
-          await page.locator('#data').fill(`${format}-export-${withFrame ? 'with' : 'no'}-frame`)
-          await setFrame(page, withFrame)
-          if (withFrame) await page.locator('#frame-text').fill(`${format.toUpperCase()} Frame Test`)
-          await page.waitForTimeout(1000)
-          await expect(page.locator('#element-to-export')).toBeVisible()
-          const download = await downloadFile(page, `#download-qr-image-button-${format}`, info.outputPath(`qr.${format}`))
-          expect(download.suggestedFilename()).toMatch(new RegExp(`qr-code\\.${format}$`, 'i'))
-          const snapshot = format === 'png'
-            ? `qr-${withFrame ? 'with' : 'no'}-frame.png`
-            : `qr-${withFrame ? 'with' : 'no'}-frame-as-jpg.png`
-          await expect(page.locator('#element-to-export')).toHaveScreenshot(snapshot)
+          await checkExport(page, info, format, withFrame)
         })
       }
     }
