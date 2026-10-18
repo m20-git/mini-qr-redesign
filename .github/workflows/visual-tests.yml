@@ -2,7 +2,7 @@ name: Visual tests
 
 on:
   push:
-    branches: [main, ci/separate-functional-and-visual-tests]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

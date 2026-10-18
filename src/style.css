@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-weight: 400;
-  color-scheme: light dark;
+  color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -231,31 +231,14 @@ input[type='checkbox']:hover {
 }
 
 /* MiniQR Studio */
-:root {
-  color-scheme: light;
-}
 body {
   margin: 0;
 }
 .studio-shell {
-  --studio-bg: #f6f7f9;
-  --studio-surface: #fff;
-  --studio-ink: #202b36;
-  --studio-muted: #75808c;
-  --studio-line: #e5e9ed;
-  --studio-accent: #267965;
   background: var(--studio-bg);
   color: var(--studio-ink);
   min-height: 100dvh;
   text-align: left;
-}
-.dark .studio-shell {
-  --studio-bg: #12191c;
-  --studio-surface: #1b2428;
-  --studio-ink: #edf4f2;
-  --studio-muted: #9caeae;
-  --studio-line: #334044;
-  --studio-accent: #7dd1b5;
 }
 .studio-header {
   max-width: 1240px;
@@ -584,53 +567,8 @@ body {
   font-size: 12px;
 }
 
-/* Shared palette also reaches dialogs rendered outside the app shell. */
-:root {
-  --background: 0 0% 97%;
-  --foreground: 0 0% 17%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 17%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 17%;
-  --muted: 0 0% 94%;
-  --muted-foreground: 0 0% 40%;
-  --border: 0 0% 85%;
-  --input: 0 0% 85%;
-  --primary: 161 52% 29%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 94%;
-  --secondary-foreground: 0 0% 17%;
-  --accent: 0 0% 91%;
-  --accent-foreground: 0 0% 17%;
-  --ring: 161 52% 29%;
-}
-:root.dark {
-  --background: 0 0% 9%;
-  --foreground: 0 0% 93%;
-  --card: 0 0% 13%;
-  --card-foreground: 0 0% 93%;
-  --popover: 0 0% 13%;
-  --popover-foreground: 0 0% 93%;
-  --muted: 0 0% 19%;
-  --muted-foreground: 0 0% 69%;
-  --border: 0 0% 29%;
-  --input: 0 0% 29%;
-  --primary: 158 44% 65%;
-  --primary-foreground: 160 30% 10%;
-  --secondary: 0 0% 19%;
-  --secondary-foreground: 0 0% 93%;
-  --accent: 0 0% 23%;
-  --accent-foreground: 0 0% 95%;
-  --ring: 158 44% 65%;
-}
-.studio-shell {
-  --studio-bg: hsl(var(--background));
-  --studio-surface: hsl(var(--card));
-  --studio-ink: hsl(var(--foreground));
-  --studio-muted: hsl(var(--muted-foreground));
-  --studio-line: hsl(var(--border));
-  --studio-accent: hsl(var(--primary));
-}
+/* Studio aliases use the shared theme tokens from index.css in both modes. */
+.studio-shell,
 .dark .studio-shell {
   --studio-bg: hsl(var(--background));
   --studio-surface: hsl(var(--card));
@@ -674,9 +612,11 @@ body {
   outline-color: hsl(var(--ring));
 }
 
+/* Keep the preset control short, reserving room for the randomize action. */
 .studio-preset-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
+  grid-template-columns: minmax(0, 250px) 44px;
+  justify-content: start;
   align-items: center;
   gap: 8px;
 }
@@ -706,11 +646,6 @@ body {
   fill: currentColor;
 }
 
-/* Keep the preset control short, reserving room for the randomize action. */
-.studio-preset-row {
-  grid-template-columns: minmax(0, 250px) 44px;
-  justify-content: start;
-}
 .studio-frame-card .studio-section-content > div > section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

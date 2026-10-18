@@ -41,7 +41,6 @@ RUN npm run build
 FROM node:lts-alpine AS production
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./
 RUN npm install -g serve
 EXPOSE 8080
