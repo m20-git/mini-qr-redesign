@@ -32,8 +32,8 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - name: Test Docker publication policy
-        run: node --test .github/scripts/docker-publication.test.mjs
+      - name: Test Docker publication policy and workflow boundaries
+        run: node --test .github/scripts/docker-*.test.mjs
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium
@@ -104,7 +104,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/docker.yml
     with:
-      publish: false
       source_sha: ${{ github.sha }}
 
   docker-publish:
@@ -116,7 +115,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: ./.github/workflows/docker.yml
+    uses: ./.github/workflows/docker-publish.yml
     with:
-      publish: true
       source_sha: ${{ github.sha }}

@@ -1,33 +1,41 @@
 # Docker publication policy
 
-The Tests workflow is the single entry point for PRs, main pushes and published releases. Docker is a reusable workflow called from it. This avoids running the functional suite twice merely to gate publication.
+The Tests workflow is the single entry point for PRs, main pushes and published releases. It calls two separate reusable workflows: docker.yml for the read-only PR build and docker-publish.yml for trusted publication. The functional suite is not duplicated merely to gate publication.
+
+## Workflow permission boundary
+
+The PR build workflow contains no publishing job and requests only contents: read. Its caller also grants only contents: read. It does not log in, push images or write registry caches.
+
+The separate publication caller grants contents: read and packages: write to docker-publish.yml. It has needs: [test, e2e, build] and runs only for main pushes or published, non-draft releases. A failed or cancelled prerequisite prevents publication. Neither workflow inherits secrets or introduces a personal token.
+
+Do not put a packages: write job back into the PR reusable workflow, even behind an if condition: permission validation can reject the entire caller before skipped jobs are evaluated. Do not work around that by granting registry write access to PR builds.
 
 ## Events and tags
 
-| Event | Image build/publication | Tags |
+| Event | Build/publication | Tags |
 | --- | --- | --- |
-| Pull request, including same-repository PRs and forks | Multi-architecture build only; no registry login or push | None |
-| Push to main after all three quality jobs succeed | Publish | main and sha-<full-commit> |
-| Published stable release after all three quality jobs succeed | Publish | release tag, release, latest and sha-<full-commit> |
-| Published prerelease after all three quality jobs succeed | Publish | release tag and sha-<full-commit>; never latest or release |
+| Pull request, including same-repository PRs and forks | ARM64/AMD64 build only | None |
+| Main push after successful quality gates | Publish | main and sha-<full-commit> |
+| Published stable release after successful quality gates | Publish | version, release, latest and sha-<full-commit> |
+| Published prerelease after successful quality gates | Publish | version and sha-<full-commit>; never latest or release |
 | Manual Tests dispatch | Tests only | None |
 
-The three quality jobs remain Unit & Browser Tests, E2E Tests (including repeated export checks) and Production build. Publication has a needs dependency on all three and is skipped if any fails or is cancelled. All checkouts explicitly use the same event SHA; Docker verifies its checkout matches that SHA. Existing functional check names remain; Docker check names change to the new reusable-job names. Update repository-required Docker check selections if configured.
+Unit & Browser Tests, E2E Tests (including repeated exports) and Production build keep their names. All checkouts explicitly use the same event SHA; Docker verifies the checked-out commit matches it. Docker check names use the reusable-job names. Update required Docker check selections if configured.
 
-The PR Docker build runs in parallel with tests, but receives only contents: read. No registry credentials or registry-cache writes are used in that job. Only the trusted publication caller and publication job request packages: write. No personal token or secrets: inherit is introduced.
+## Compatibility and limits
 
-Publication is serialized separately for main and release aliases. The caller also cancels superseded runs for the same event/ref. An intentionally rerun older stable release can repoint latest; latest means the last successfully published stable-release run, not a semver ordering guarantee. A delayed older main run is likewise not an atomic latest-main guarantee.
+Main no longer updates latest. Deployments following main should use main; stable deployments can use latest or pin a version/digest. Existing tags are not deleted. The next successful stable-release publication updates latest.
 
-## Compatibility change
+Release tags must be valid Docker tags, match the release ref and not collide with main/latest/release/sha-* names. They are not silently rewritten. Release tags must contain these workflow files for the release trigger and policy to be available.
 
-Main pushes no longer update latest. Deployments that intentionally follow main should use the main tag. Deployments following stable releases can keep latest or pin an explicit version/digest. Existing tags are not deleted by this change; latest will change on the next successful stable-release publication.
+Publication is serialized separately for main and release aliases. The caller cancels superseded runs for the same event/ref. Rerunning an older stable release can repoint latest: it denotes the last successfully published stable-release run, not guaranteed semantic-version order. A delayed older main run is likewise not an atomic latest-main guarantee.
 
-Release tags must be valid Docker tags, exactly match the release ref, and not collide with reserved main/latest/release/sha-* names. Tags are not silently rewritten. Release tags must contain these workflow files for the release trigger and policy to be available.
+The Dockerfile, package manager, BuildKit workaround, application code, installers and visual-baseline process are unchanged. Reproducible dependency installation remains a separate follow-up: matching source SHAs alone does not guarantee matching npm/pnpm dependency resolutions.
 
 ## Validation
 
-Run `node --test .github/scripts/docker-publication.test.mjs`. The Unit & Browser Tests job also runs these dependency-free policy tests. They cover main, stable and prerelease tags, denied PR/manual/feature events, exact SHA matching and invalid/reserved release metadata.
+Run `node --test .github/scripts/docker-*.test.mjs`. CI runs the existing eight tag/event-policy tests and four additional workflow-boundary regression tests. The latter assert read-only PR permissions, reject even a hypothetical skipped write job, check separate caller targets and preserve the publication gate. These targeted source assertions do not replace GitHub Actions validation.
 
-Before merging, inspect the PR Docker job: both architectures must build, no login action must run, and no image must be pushed. After merging, verify Tests succeed before publication starts and only main/sha tags are produced. Verify stable-release and prerelease publication during a real release; unit tests alone do not prove registry permissions or successful image pushes. No release is created merely to test this change.
+Before merge, confirm that Unit & Browser Tests, E2E Tests, Production build and the PR Docker build all actually run and pass. A green visual workflow alone is insufficient. Inspect the PR Docker job for absence of registry login and push.
 
-The Dockerfile, package-manager choice, BuildKit workaround, application code, installers and visual-baseline process are unchanged. Reproducible dependency installation is a separate follow-up: testing the same source SHA does not yet guarantee identical resolved npm and pnpm dependencies.
+After merge, verify publication starts only after all three quality jobs succeed and produces main/sha tags only. Verify stable-release and prerelease publication during real releases. Local tests do not prove registry permissions or successful image pushes. Do not create a release merely to test this correction.
