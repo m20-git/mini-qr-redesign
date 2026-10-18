@@ -1,0 +1,76 @@
+name: Docker publication
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Exact event SHA checked by the caller
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish tested image
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'release' && github.event.action == 'published' && !github.event.release.draft)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: docker-publish-${{ github.repository }}-${{ github.event_name == 'release' && 'release' || 'main' }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout exact tested commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - name: Verify source identity
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          test "$SOURCE_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+      - name: Validate publication event and generate explicit tags
+        id: metadata
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node .github/scripts/docker-publication.mjs
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.10.6
+      - name: Login to GitHub Container Registry for publication only
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and publish tested source
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64,linux/amd64
+          push: true
+          cache-from: type=registry,ref=${{ steps.metadata.outputs.cache }}
+          cache-to: type=registry,mode=max,ref=${{ steps.metadata.outputs.cache }}
+          build-args: |
+            VITE_APP_VERSION=${{ steps.metadata.outputs.version }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ inputs.source_sha }}
